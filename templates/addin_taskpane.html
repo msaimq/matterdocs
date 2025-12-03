@@ -157,14 +157,21 @@
         }
         
         function saveEmail() {
+            console.log('saveEmail clicked');
             const matterId = document.getElementById('matter-select').value;
+            console.log('Selected matter ID:', matterId);
+            
             if (!matterId) {
                 alert('Please select a matter first');
                 return;
             }
             
+            alert('Starting to save email...');
+            
             try {
+                console.log('Getting email body...');
                 Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, (result) => {
+                    console.log('Body result:', result);
                     if (result.status === Office.AsyncResultStatus.Succeeded) {
                         const emailData = {
                             ...currentEmail,
@@ -172,22 +179,31 @@
                             matterId: matterId
                         };
                         
+                        console.log('Sending email data:', emailData);
+                        
                         fetch('/api/email/save', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(emailData)
                         })
-                        .then(response => response.json())
+                        .then(response => {
+                            console.log('Response status:', response.status);
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            return response.json();
+                        })
                         .then(result => {
+                            console.log('Save result:', result);
                             alert('Email saved successfully!');
                         })
                         .catch(error => {
-                            console.error('Error:', error);
+                            console.error('Error saving email:', error);
                             alert('Error saving email: ' + error.message);
                         });
                     } else {
                         console.error('Failed to get email body:', result.error);
-                        alert('Failed to get email content');
+                        alert('Failed to get email content: ' + (result.error ? result.error.message : 'Unknown error'));
                     }
                 });
             } catch (error) {
@@ -197,7 +213,10 @@
         }
         
         function saveSelectedAttachments() {
+            console.log('saveSelectedAttachments clicked');
             const matterId = document.getElementById('matter-select').value;
+            console.log('Selected matter ID:', matterId);
+            
             if (!matterId) {
                 alert('Please select a matter first');
                 return;
@@ -211,6 +230,8 @@
                 }
             });
             
+            console.log('Selected attachments:', selectedAttachments);
+            
             if (selectedAttachments.length === 0) {
                 alert('Please select at least one attachment');
                 return;
@@ -220,8 +241,10 @@
             
             // Process each attachment
             selectedAttachments.forEach((attachment, index) => {
+                console.log('Processing attachment:', attachment.name);
                 try {
                     Office.context.mailbox.item.getAttachmentContentAsync(attachment.id, (result) => {
+                        console.log('Attachment content result:', result);
                         if (result.status === Office.AsyncResultStatus.Succeeded) {
                             const attachmentData = {
                                 name: attachment.name,
@@ -230,30 +253,38 @@
                                 matterId: matterId
                             };
                             
+                            console.log('Sending attachment data for:', attachment.name);
+                            
                             fetch('/api/attachments/save', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(attachmentData)
                             })
-                            .then(response => response.json())
+                            .then(response => {
+                                console.log('Attachment response status:', response.status);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP ${response.status}`);
+                                }
+                                return response.json();
+                            })
                             .then(result => {
-                                console.log('Attachment saved:', attachment.name);
+                                console.log('Attachment saved:', attachment.name, result);
                                 if (index === selectedAttachments.length - 1) {
                                     alert('All attachments saved successfully!');
                                 }
                             })
                             .catch(error => {
                                 console.error('Error saving attachment:', error);
-                                alert('Error saving attachment: ' + attachment.name);
+                                alert('Error saving attachment ' + attachment.name + ': ' + error.message);
                             });
                         } else {
                             console.error('Failed to get attachment content:', result.error);
-                            alert('Failed to get attachment: ' + attachment.name);
+                            alert('Failed to get attachment: ' + attachment.name + ' - ' + (result.error ? result.error.message : 'Unknown error'));
                         }
                     });
                 } catch (error) {
                     console.error('Error processing attachment:', error);
-                    alert('Error processing attachment: ' + attachment.name);
+                    alert('Error processing attachment ' + attachment.name + ': ' + error.message);
                 }
             });
         }
