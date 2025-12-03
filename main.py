@@ -352,6 +352,111 @@ async def save_attachment(
     return {"success": True, "document_id": document.id, "summary": summary}
 
 
+@app.get("/api/documents/{document_id}/versions/{version_number}/download")
+async def download_document(
+    document_id: int,
+    version_number: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """Download a specific document version."""
+    result = await session.execute(
+        select(DocumentVersion, Document.title)
+        .join(Document)
+        .where(
+            DocumentVersion.document_id == document_id,
+            DocumentVersion.version_number == version_number
+        )
+    )
+    version_data = result.first()
+    
+    if not version_data:
+        raise HTTPException(status_code=404, detail="Document version not found")
+    
+    version, title = version_data
+    file_path = Path(version.file_path)
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    return FileResponse(
+        path=file_path,
+        filename=f"{title}_v{version_number}{file_path.suffix}",
+        media_type='application/octet-stream'
+    )
+
+
+@app.get("/api/documents/{document_id}/versions/{version_number}/preview")
+async def preview_document(
+    document_id: int,
+    version_number: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """Preview a specific document version."""
+    result = await session.execute(
+        select(DocumentVersion, Document.title)
+        .join(Document)
+        .where(
+            DocumentVersion.document_id == document_id,
+            DocumentVersion.version_number == version_number
+        )
+    )
+    version_data = result.first()
+    
+    if not version_data:
+        raise HTTPException(status_code=404, detail="Document version not found")
+    
+    version, title = version_data
+    file_path = Path(version.file_path)
+    
+    # Try to read file content for preview
+    content = "Preview not available for this file type."
+    if file_path.exists():
+        try:
+            if file_path.suffix.lower() in ['.txt', '.md', '.csv']:
+                content = file_path.read_text(encoding='utf-8', errors='ignore')
+            elif 'email' in title.lower():
+                content = file_path.read_text(encoding='utf-8', errors='ignore')
+            else:
+                content = f"Binary file: {file_path.name}\nSize: {file_path.stat().st_size} bytes"
+        except Exception as e:
+            content = f"Error reading file: {str(e)}"
+    
+    return {
+        "title": title,
+        "version": version_number,
+        "summary": version.summary,
+        "created_at": version.created_at.isoformat(),
+        "content": content[:5000]  # Limit preview to 5000 chars
+    }
+
+
+@app.get("/api/documents/{document_id}/versions")
+async def get_document_versions(
+    document_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """Get all versions of a document."""
+    result = await session.execute(
+        select(DocumentVersion)
+        .where(DocumentVersion.document_id == document_id)
+        .order_by(DocumentVersion.version_number.desc())
+    )
+    versions = result.scalars().all()
+    
+    if not versions:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    return [
+        {
+            "version_number": version.version_number,
+            "summary": version.summary,
+            "created_at": version.created_at.isoformat(),
+            "file_path": version.file_path
+        }
+        for version in versions
+    ]
+
+
 @app.get("/matters", response_class=HTMLResponse)
 async def list_matters(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     result = await session.execute(

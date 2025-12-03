@@ -1,45 +1,179 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ client.name }} - {{ matter.name }}</h2>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <h2>{{ client.name }} - {{ matter.name }}</h2>
+    <div>
+        <input type="text" id="doc-search" placeholder="Search documents..." style="padding: 8px; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px;" oninput="filterDocuments()">
+        <button onclick="toggleUploadForm()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">+ Upload Document</button>
+    </div>
+</div>
 
-<h3>Documents</h3>
-<table>
-    <thead>
-        <tr>
-            <th>Title</th>
-            <th>Latest Version</th>
-            <th>Summary</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for doc, version in documents_with_versions %}
-        <tr>
-            <td>{{ doc.title }}</td>
-            <td>{{ version.version_number if version else 'N/A' }}</td>
-            <td>
-                {% if version %}
-                    {{ version.summary[:150] }}{% if version.summary|length > 150 %}...{% endif %}
-                {% else %}
-                    No versions yet.
-                {% endif %}
-            </td>
-        </tr>
-    {% else %}
-        <tr><td colspan="3">No documents uploaded.</td></tr>
-    {% endfor %}
-    </tbody>
-</table>
+<h3>Documents ({{ documents_with_versions|length }})</h3>
 
-<section class="upload">
+<div id="document-browser">
+    <table id="documents-table" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: #f8f9fa;">
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Title</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Type</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Version</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Created</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Summary</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for doc, version in documents_with_versions %}
+            <tr class="document-row" style="border-bottom: 1px solid #dee2e6;" data-title="{{ doc.title.lower() }}" data-type="{{ doc.title.split(':')[0] if ':' in doc.title else 'Other' }}">
+                <td style="padding: 12px;">
+                    <strong>{{ doc.title }}</strong><br>
+                    <small style="color: #6c757d;">ID: {{ doc.id }}</small>
+                </td>
+                <td style="padding: 12px;">
+                    <span style="background: #e9ecef; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                        {{ doc.title.split(':')[0] if ':' in doc.title else 'Other' }}
+                    </span>
+                </td>
+                <td style="padding: 12px;">{{ version.version_number if version else 'N/A' }}</td>
+                <td style="padding: 12px;">{{ doc.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td style="padding: 12px;">
+                    {% if version %}
+                        {{ version.summary[:100] }}{% if version.summary|length > 100 %}...{% endif %}
+                    {% else %}
+                        No versions yet.
+                    {% endif %}
+                </td>
+                <td style="padding: 12px;">
+                    {% if version %}
+                        <button onclick="downloadDocument({{ doc.id }}, {{ version.version_number }})" style="background: #28a745; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 12px;">Download</button>
+                        <button onclick="previewDocument({{ doc.id }}, {{ version.version_number }})" style="background: #17a2b8; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 12px;">Preview</button>
+                        <button onclick="showVersionHistory({{ doc.id }})" style="background: #6c757d; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Versions</button>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6" style="padding: 20px; text-align: center; color: #6c757d;">No documents uploaded yet. Use the upload form below to add documents.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<section class="upload" id="upload-section" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
     <h3>Upload Document</h3>
     <form method="post" action="/matters/{{ matter.id }}/upload" enctype="multipart/form-data">
-        <label for="title">Title</label>
-        <input type="text" id="title" name="title" required>
+        <div style="margin-bottom: 15px;">
+            <label for="title" style="display: block; margin-bottom: 5px; font-weight: bold;">Title</label>
+            <input type="text" id="title" name="title" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="file" style="display: block; margin-bottom: 5px; font-weight: bold;">File</label>
+            <input type="file" id="file" name="file" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
 
-        <label for="file">File</label>
-        <input type="file" id="file" name="file" required>
-
-        <button type="submit">Upload</button>
+        <button type="submit" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">Upload</button>
+        <button type="button" onclick="toggleUploadForm()" style="background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Cancel</button>
     </form>
 </section>
+
+<!-- Document Preview Modal -->
+<div id="preview-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 80%; max-height: 80%; overflow: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 id="preview-title">Document Preview</h3>
+            <button onclick="closePreview()" style="background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">&times;</button>
+        </div>
+        <div id="preview-content" style="max-height: 400px; overflow-y: auto; padding: 15px; background: #f8f9fa; border-radius: 4px;"></div>
+    </div>
+</div>
+
+<!-- Version History Modal -->
+<div id="version-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 60%; max-height: 70%; overflow: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>Version History</h3>
+            <button onclick="closeVersionHistory()" style="background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">&times;</button>
+        </div>
+        <div id="version-content"></div>
+    </div>
+</div>
+
+<script>
+    function filterDocuments() {
+        const query = document.getElementById('doc-search').value.toLowerCase();
+        const rows = document.querySelectorAll('.document-row');
+        
+        rows.forEach(row => {
+            const title = row.dataset.title;
+            const type = row.dataset.type.toLowerCase();
+            const visible = title.includes(query) || type.includes(query);
+            row.style.display = visible ? '' : 'none';
+        });
+    }
+    
+    function toggleUploadForm() {
+        const section = document.getElementById('upload-section');
+        section.style.display = section.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    function downloadDocument(docId, version) {
+        window.open(`/api/documents/${docId}/versions/${version}/download`, '_blank');
+    }
+    
+    function previewDocument(docId, version) {
+        fetch(`/api/documents/${docId}/versions/${version}/preview`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('preview-title').textContent = data.title;
+                document.getElementById('preview-content').innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>Summary:</strong> ${data.summary}<br>
+                        <strong>Version:</strong> ${data.version}<br>
+                        <strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}
+                    </div>
+                    <div style="white-space: pre-wrap; font-family: monospace; font-size: 14px;">${data.content}</div>
+                `;
+                document.getElementById('preview-modal').style.display = 'block';
+            })
+            .catch(error => {
+                alert('Error loading preview: ' + error.message);
+            });
+    }
+    
+    function showVersionHistory(docId) {
+        fetch(`/api/documents/${docId}/versions`)
+            .then(response => response.json())
+            .then(versions => {
+                let html = '<table style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: #f8f9fa;"><th style="padding: 10px; border-bottom: 1px solid #dee2e6;">Version</th><th style="padding: 10px; border-bottom: 1px solid #dee2e6;">Created</th><th style="padding: 10px; border-bottom: 1px solid #dee2e6;">Summary</th><th style="padding: 10px; border-bottom: 1px solid #dee2e6;">Actions</th></tr></thead><tbody>';
+                
+                versions.forEach(version => {
+                    html += `<tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px;">${version.version_number}</td>
+                        <td style="padding: 10px;">${new Date(version.created_at).toLocaleString()}</td>
+                        <td style="padding: 10px;">${version.summary.substring(0, 100)}...</td>
+                        <td style="padding: 10px;">
+                            <button onclick="downloadDocument(${docId}, ${version.version_number})" style="background: #28a745; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 12px;">Download</button>
+                            <button onclick="previewDocument(${docId}, ${version.version_number})" style="background: #17a2b8; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Preview</button>
+                        </td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table>';
+                document.getElementById('version-content').innerHTML = html;
+                document.getElementById('version-modal').style.display = 'block';
+            })
+            .catch(error => {
+                alert('Error loading version history: ' + error.message);
+            });
+    }
+    
+    function closePreview() {
+        document.getElementById('preview-modal').style.display = 'none';
+    }
+    
+    function closeVersionHistory() {
+        document.getElementById('version-modal').style.display = 'none';
+    }
+</script>
 {% endblock %}
