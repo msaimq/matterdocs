@@ -15,9 +15,12 @@ if db_url_env:
     if db_url_env.startswith("postgres://"):
         # Fix for SQLAlchemy 2.0 compatibility
         DATABASE_URL = db_url_env.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif db_url_env.startswith("postgresql://"):
+        # Also fix postgresql:// to use asyncpg
+        DATABASE_URL = db_url_env.replace("postgresql://", "postgresql+asyncpg://", 1)
     else:
         DATABASE_URL = db_url_env
-    print(f"🔗 Using PostgreSQL: {DATABASE_URL[:50]}...")
+    print(f"🔗 Using PostgreSQL (async): {DATABASE_URL[:50]}...")
 else:
     # Local development: Use SQLite with async driver
     default_db_path = Path(os.getenv("DATABASE_FILE", "matterdocs.db"))
@@ -25,10 +28,12 @@ else:
     print(f"🔗 Using SQLite: {DATABASE_URL}")
 
 try:
+    print(f"🔧 Final DATABASE_URL: {DATABASE_URL[:60]}...")
     engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
     print("✅ Database engine created successfully")
 except Exception as e:
     print(f"❌ Database engine creation failed: {e}")
+    print(f"❌ Failed URL was: {DATABASE_URL[:60]}...")
     # Fallback to a minimal in-memory SQLite for health checks
     DATABASE_URL = "sqlite+aiosqlite:///:memory:"
     engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
