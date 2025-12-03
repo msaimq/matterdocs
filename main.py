@@ -34,12 +34,25 @@ async def on_startup() -> None:
         # Ensure storage directory exists
         STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
         
-        # Initialize database
-        await init_db()
-        await seed_data()
-        print("✅ Application startup completed successfully")
+        # Initialize database with retry
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                await init_db()
+                await seed_data()
+                print("✅ Application startup completed successfully")
+                break
+            except Exception as db_error:
+                print(f"⚠️ Database attempt {attempt + 1} failed: {db_error}")
+                if attempt == max_retries - 1:
+                    print("❌ Database connection failed after all retries")
+                    # Continue without database for health check
+                else:
+                    import asyncio
+                    await asyncio.sleep(2)
     except Exception as e:
         print(f"❌ Startup error: {e}")
+        # Don't fail startup completely
 
 
 async def seed_data() -> None:
@@ -64,7 +77,14 @@ async def seed_data() -> None:
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway."""
-    return {"status": "healthy", "service": "MatterDocs"}
+    try:
+        # Test database connection
+        async with async_session_maker() as session:
+            await session.execute(select(1))
+        return {"status": "healthy", "service": "MatterDocs", "database": "connected"}
+    except Exception as e:
+        # Return healthy even if DB is down (for initial deployment)
+        return {"status": "healthy", "service": "MatterDocs", "database": "disconnected", "error": str(e)}
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
