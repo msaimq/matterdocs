@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ai import summarize_text
+import base64
 from db import async_session_maker, init_db
 from models import Client, Document, DocumentTag, DocumentVersion, Matter, Tag
 
@@ -98,6 +99,193 @@ async def serve_manifest() -> FileResponse:
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Manifest not found")
     return FileResponse(manifest_path, media_type="application/xml")
+
+
+@app.get("/api/matters/list")
+async def list_matters_api(session: AsyncSession = Depends(get_session)):
+    """API endpoint to get all matters for dropdown selection."""
+    result = await session.execute(
+        select(Matter, Client.name.label('client_name'))
+        .join(Client)
+        .order_by(Client.name, Matter.name)
+    )
+    matters = []
+    for matter, client_name in result.all():
+        matters.append({
+            "id": matter.id,
+            "name": matter.name,
+            "client_name": client_name
+        })
+    return matters
+
+
+@app.post("/api/email/save")
+async def save_email(
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+):
+    """Save email content as a document."""
+    data = await request.json()
+    matter_id = data.get('matterId')
+    subject = data.get('subject', 'No Subject')
+    from_addr = data.get('from', '')
+    date = data.get('date', '')
+    body = data.get('body', '')
+    
+    # Verify matter exists
+    matter_result = await session.execute(
+        select(Matter).where(Matter.id == matter_id)
+    )
+    matter = matter_result.scalars().first()
+    if not matter:
+        raise HTTPException(status_code=404, detail="Matter not found")
+    
+    # Create email document
+    email_content = f"From: {from_addr}\nDate: {date}\nSubject: {subject}\n\n{body}"
+    document_title = f"Email: {subject[:50]}..."
+    
+    # Check if document already exists
+    doc_result = await session.execute(
+        select(Document).where(Document.matter_id == matter.id, Document.title == document_title)
+    )
+    document = doc_result.scalars().first()
+    
+    if document:
+        # Create new version
+        version_result = await session.execute(
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == document.id)
+            .order_by(DocumentVersion.version_number.desc())
+            .limit(1)
+        )
+        latest_version = version_result.scalars().first()
+        next_version_number = (latest_version.version_number if latest_version else 0) + 1
+    else:
+        # Create new document
+        document = Document(matter_id=matter.id, title=document_title)
+        session.add(document)
+        await session.flush()
+        next_version_number = 1
+    
+    # Generate AI summary
+    summary, tags = await summarize_text(email_content)
+    
+    # Save document version
+    doc_version = DocumentVersion(
+        document_id=document.id,
+        version_number=next_version_number,
+        file_path=f"email_{document.id}_{next_version_number}.txt",
+        summary=summary,
+    )
+    session.add(doc_version)
+    await session.flush()
+    
+    # Add tags
+    for tag_name in tags:
+        tag_result = await session.execute(select(Tag).where(Tag.name == tag_name))
+        tag_obj = tag_result.scalars().first()
+        if tag_obj is None:
+            tag_obj = Tag(name=tag_name)
+            session.add(tag_obj)
+            await session.flush()
+        session.add(DocumentTag(document_version_id=doc_version.id, tag_id=tag_obj.id))
+    
+    await session.commit()
+    
+    return {"success": True, "document_id": document.id, "summary": summary}
+
+
+@app.post("/api/attachments/save")
+async def save_attachment(
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+):
+    """Save email attachment as a document."""
+    data = await request.json()
+    matter_id = data.get('matterId')
+    name = data.get('name')
+    content = data.get('content')  # Base64 encoded
+    content_type = data.get('contentType')
+    
+    # Verify matter exists
+    matter_result = await session.execute(
+        select(Matter).where(Matter.id == matter_id)
+    )
+    matter = matter_result.scalars().first()
+    if not matter:
+        raise HTTPException(status_code=404, detail="Matter not found")
+    
+    # Decode attachment content
+    import base64
+    try:
+        file_bytes = base64.b64decode(content)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid attachment content")
+    
+    # Create document
+    document_title = f"Attachment: {name}"
+    
+    # Check if document already exists
+    doc_result = await session.execute(
+        select(Document).where(Document.matter_id == matter.id, Document.title == document_title)
+    )
+    document = doc_result.scalars().first()
+    
+    if document:
+        # Create new version
+        version_result = await session.execute(
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == document.id)
+            .order_by(DocumentVersion.version_number.desc())
+            .limit(1)
+        )
+        latest_version = version_result.scalars().first()
+        next_version_number = (latest_version.version_number if latest_version else 0) + 1
+    else:
+        # Create new document
+        document = Document(matter_id=matter.id, title=document_title)
+        session.add(document)
+        await session.flush()
+        next_version_number = 1
+    
+    # Save file to storage
+    storage_dir = STORAGE_ROOT / str(matter.client_id) / str(matter.id) / str(document.id) / str(next_version_number)
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    file_path = storage_dir / name
+    file_path.write_bytes(file_bytes)
+    
+    # Extract text for AI processing
+    try:
+        text_content = file_bytes.decode('utf-8', errors='ignore')
+    except:
+        text_content = f"Binary file: {name}"
+    
+    # Generate AI summary
+    summary, tags = await summarize_text(text_content)
+    
+    # Save document version
+    doc_version = DocumentVersion(
+        document_id=document.id,
+        version_number=next_version_number,
+        file_path=str(file_path),
+        summary=summary,
+    )
+    session.add(doc_version)
+    await session.flush()
+    
+    # Add tags
+    for tag_name in tags:
+        tag_result = await session.execute(select(Tag).where(Tag.name == tag_name))
+        tag_obj = tag_result.scalars().first()
+        if tag_obj is None:
+            tag_obj = Tag(name=tag_name)
+            session.add(tag_obj)
+            await session.flush()
+        session.add(DocumentTag(document_version_id=doc_version.id, tag_id=tag_obj.id))
+    
+    await session.commit()
+    
+    return {"success": True, "document_id": document.id, "summary": summary}
 
 
 @app.get("/matters", response_class=HTMLResponse)

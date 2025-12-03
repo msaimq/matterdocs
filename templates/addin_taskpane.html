@@ -6,15 +6,223 @@
     <title>MatterDocs Add-in</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    <style>
+        .email-info { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .attachment-list { margin: 10px 0; }
+        .attachment-item { padding: 8px; border: 1px solid #ddd; margin: 5px 0; border-radius: 4px; }
+        .button { background: #0078d4; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 5px; }
+        .button:hover { background: #106ebe; }
+        .loading { color: #666; font-style: italic; }
+        .matter-select { width: 100%; padding: 8px; margin: 10px 0; }
+    </style>
 </head>
 <body>
     <header>
         <h1>MatterDocs</h1>
     </header>
     <main>
-        <p>This Outlook add-in panel is connected to your local MatterDocs app.</p>
-        <p><a class="button" target="_blank" rel="noopener" href="/matters">Open Matters</a></p>
-        <p>If you do not see content, make sure the server is running at <code>https://localhost:8000</code>.</p>
+        <div id="loading" class="loading">Loading email information...</div>
+        
+        <div id="email-content" style="display: none;">
+            <div class="email-info">
+                <h3>Current Email</h3>
+                <div><strong>Subject:</strong> <span id="email-subject"></span></div>
+                <div><strong>From:</strong> <span id="email-from"></span></div>
+                <div><strong>Date:</strong> <span id="email-date"></span></div>
+            </div>
+            
+            <div class="attachment-list">
+                <h3>Attachments (<span id="attachment-count">0</span>)</h3>
+                <div id="attachments-container"></div>
+            </div>
+            
+            <div>
+                <h3>Save to Matter</h3>
+                <select id="matter-select" class="matter-select">
+                    <option value="">Select a matter...</option>
+                </select>
+                
+                <button class="button" onclick="saveEmail()">Save Email</button>
+                <button class="button" onclick="saveSelectedAttachments()">Save Selected Attachments</button>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <a class="button" target="_blank" rel="noopener" href="/matters">Open MatterDocs</a>
+            </div>
+        </div>
     </main>
+    
+    <script>
+        let currentEmail = {};
+        let attachments = [];
+        
+        Office.onReady((info) => {
+            if (info.host === Office.HostType.Outlook) {
+                loadEmailInfo();
+                loadMatters();
+            }
+        });
+        
+        function loadEmailInfo() {
+            Office.context.mailbox.item.subject.getAsync((result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                    document.getElementById('email-subject').textContent = result.value || 'No subject';
+                    currentEmail.subject = result.value;
+                }
+            });
+            
+            Office.context.mailbox.item.from.getAsync((result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                    const from = result.value.displayName + ' <' + result.value.emailAddress + '>';
+                    document.getElementById('email-from').textContent = from;
+                    currentEmail.from = from;
+                }
+            });
+            
+            Office.context.mailbox.item.dateTimeCreated.getAsync((result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                    const date = new Date(result.value).toLocaleString();
+                    document.getElementById('email-date').textContent = date;
+                    currentEmail.date = date;
+                }
+            });
+            
+            loadAttachments();
+        }
+        
+        function loadAttachments() {
+            const item = Office.context.mailbox.item;
+            attachments = item.attachments || [];
+            
+            document.getElementById('attachment-count').textContent = attachments.length;
+            
+            const container = document.getElementById('attachments-container');
+            container.innerHTML = '';
+            
+            if (attachments.length === 0) {
+                container.innerHTML = '<div class="attachment-item">No attachments found</div>';
+            } else {
+                attachments.forEach((attachment, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'attachment-item';
+                    div.innerHTML = `
+                        <input type="checkbox" id="att-${index}" checked>
+                        <label for="att-${index}">
+                            <strong>${attachment.name}</strong> (${formatFileSize(attachment.size)})
+                        </label>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('email-content').style.display = 'block';
+        }
+        
+        function loadMatters() {
+            fetch('/api/matters/list')
+                .then(response => response.json())
+                .then(matters => {
+                    const select = document.getElementById('matter-select');
+                    matters.forEach(matter => {
+                        const option = document.createElement('option');
+                        option.value = matter.id;
+                        option.textContent = `${matter.client_name} - ${matter.name}`;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading matters:', error));
+        }
+        
+        function saveEmail() {
+            const matterId = document.getElementById('matter-select').value;
+            if (!matterId) {
+                alert('Please select a matter first');
+                return;
+            }
+            
+            Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, (result) => {
+                if (result.status === Office.AsyncResultStatus.Succeeded) {
+                    const emailData = {
+                        ...currentEmail,
+                        body: result.value,
+                        matterId: matterId
+                    };
+                    
+                    fetch('/api/email/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(emailData)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        alert('Email saved successfully!');
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error saving email');
+                    });
+                }
+            });
+        }
+        
+        function saveSelectedAttachments() {
+            const matterId = document.getElementById('matter-select').value;
+            if (!matterId) {
+                alert('Please select a matter first');
+                return;
+            }
+            
+            const selectedAttachments = [];
+            attachments.forEach((attachment, index) => {
+                const checkbox = document.getElementById(`att-${index}`);
+                if (checkbox && checkbox.checked) {
+                    selectedAttachments.push(attachment);
+                }
+            });
+            
+            if (selectedAttachments.length === 0) {
+                alert('Please select at least one attachment');
+                return;
+            }
+            
+            // Process each attachment
+            selectedAttachments.forEach(attachment => {
+                Office.context.mailbox.item.getAttachmentContentAsync(attachment.id, (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        const attachmentData = {
+                            name: attachment.name,
+                            content: result.value.content,
+                            contentType: result.value.format,
+                            matterId: matterId
+                        };
+                        
+                        fetch('/api/attachments/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(attachmentData)
+                        })
+                        .then(response => response.json())
+                        .then(result => {
+                            console.log('Attachment saved:', attachment.name);
+                        })
+                        .catch(error => {
+                            console.error('Error saving attachment:', error);
+                        });
+                    }
+                });
+            });
+            
+            alert(`Saving ${selectedAttachments.length} attachment(s)...`);
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
 </body>
 </html>
