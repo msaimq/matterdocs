@@ -12,15 +12,21 @@ db_url_env = os.getenv("DATABASE_URL", "").strip()
 
 if db_url_env:
     # Production: Use Railway's PostgreSQL
+    print(f"🔍 Original URL: {db_url_env[:50]}...")
+    
     if db_url_env.startswith("postgres://"):
         # Fix for SQLAlchemy 2.0 compatibility
         DATABASE_URL = db_url_env.replace("postgres://", "postgresql+asyncpg://", 1)
+        print("🔄 Converted postgres:// to postgresql+asyncpg://")
     elif db_url_env.startswith("postgresql://"):
         # Also fix postgresql:// to use asyncpg
         DATABASE_URL = db_url_env.replace("postgresql://", "postgresql+asyncpg://", 1)
+        print("🔄 Converted postgresql:// to postgresql+asyncpg://")
     else:
         DATABASE_URL = db_url_env
-    print(f"🔗 Using PostgreSQL (async): {DATABASE_URL[:50]}...")
+        print("⚠️ Using URL as-is (no conversion needed)")
+    
+    print(f"🔗 Final PostgreSQL URL: {DATABASE_URL[:50]}...")
 else:
     # Local development: Use SQLite with async driver
     default_db_path = Path(os.getenv("DATABASE_FILE", "matterdocs.db"))
@@ -28,13 +34,14 @@ else:
     print(f"🔗 Using SQLite: {DATABASE_URL}")
 
 try:
-    print(f"🔧 Final DATABASE_URL: {DATABASE_URL[:60]}...")
+    print(f"🔧 Creating engine with: {DATABASE_URL[:60]}...")
     engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
-    print("✅ Database engine created successfully")
+    print("✅ PostgreSQL engine created successfully!")
 except Exception as e:
     print(f"❌ Database engine creation failed: {e}")
-    print(f"❌ Failed URL was: {DATABASE_URL[:60]}...")
+    print(f"❌ Failed URL: {DATABASE_URL[:60]}...")
     # Fallback to a minimal in-memory SQLite for health checks
+    print("🔄 Falling back to in-memory SQLite...")
     DATABASE_URL = "sqlite+aiosqlite:///:memory:"
     engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
     print("⚠️ Using fallback in-memory database")
