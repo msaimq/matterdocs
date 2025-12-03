@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from typing import List, Tuple
 
@@ -375,8 +376,22 @@ async def download_document(
     version, title = version_data
     file_path = Path(version.file_path)
     
+    # Check if file exists on disk
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
+        # For Railway: Files are lost on restart, so create a text file with summary
+        content = f"Document: {title}\nVersion: {version_number}\nSummary: {version.summary}\n\nNote: Original file not available (Railway storage limitation)"
+        
+        # Create temporary file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        return FileResponse(
+            path=temp_path,
+            filename=f"{title}_v{version_number}_summary.txt",
+            media_type='text/plain'
+        )
     
     return FileResponse(
         path=file_path,
@@ -409,7 +424,7 @@ async def preview_document(
     file_path = Path(version.file_path)
     
     # Try to read file content for preview
-    content = "Preview not available for this file type."
+    content = "File not available (Railway storage limitation)"
     if file_path.exists():
         try:
             if file_path.suffix.lower() in ['.txt', '.md', '.csv']:
@@ -420,6 +435,9 @@ async def preview_document(
                 content = f"Binary file: {file_path.name}\nSize: {file_path.stat().st_size} bytes"
         except Exception as e:
             content = f"Error reading file: {str(e)}"
+    else:
+        # Show summary instead of file content
+        content = f"Original file not available.\n\nDocument Summary:\n{version.summary}\n\nNote: Files are not persisted on Railway. Consider using cloud storage (AWS S3, etc.) for production."
     
     return {
         "title": title,
