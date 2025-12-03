@@ -37,15 +37,55 @@
             </div>
             
             <div>
-                <h3>Save to Matter</h3>
-                <select id="matter-select" class="matter-select">
-                    <option value="">Select a matter...</option>
-                </select>
+                <h3>File to Matter</h3>
+                
+                <!-- Smart Matter Search -->
+                <div style="position: relative;">
+                    <input type="text" id="matter-search" placeholder="Search matters..." 
+                           style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;"
+                           oninput="searchMatters()" onfocus="showMatterDropdown()">
+                    <div id="matter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 1000;"></div>
+                </div>
+                
+                <!-- Quick Matter Creation -->
+                <div style="text-align: center; margin: 10px 0;">
+                    <button class="button" onclick="toggleNewMatterForm()" style="background: #28a745; font-size: 12px; padding: 5px 10px;">+ New Matter</button>
+                </div>
+                
+                <!-- New Matter Form -->
+                <div id="new-matter-form" style="display: none; background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                    <h4 style="margin: 0 0 10px 0;">Create New Matter</h4>
+                    <input type="text" id="client-name" placeholder="Client Name" style="width: 100%; padding: 6px; margin: 3px 0; border: 1px solid #ddd; border-radius: 3px;">
+                    <input type="text" id="matter-name" placeholder="Matter Name" style="width: 100%; padding: 6px; margin: 3px 0; border: 1px solid #ddd; border-radius: 3px;">
+                    <div style="text-align: center; margin-top: 10px;">
+                        <button class="button" onclick="createNewMatter()" style="background: #28a745; font-size: 12px; padding: 5px 15px;">Create</button>
+                        <button class="button" onclick="toggleNewMatterForm()" style="background: #6c757d; font-size: 12px; padding: 5px 15px;">Cancel</button>
+                    </div>
+                </div>
+                
+                <!-- Document Type Selection -->
+                <div>
+                    <label style="font-weight: bold; font-size: 12px;">Document Type:</label>
+                    <select id="document-type" style="width: 100%; padding: 6px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="Email">Email</option>
+                        <option value="Contract">Contract</option>
+                        <option value="Report">Report</option>
+                        <option value="Correspondence">Correspondence</option>
+                        <option value="Legal Brief">Legal Brief</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
                 
                 <button class="button" onclick="saveEmail()">Save Email</button>
                 <button class="button" onclick="saveSelectedAttachments()">Save Selected Attachments</button>
                 
                 <div id="status-message" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px; display: none;"></div>
+            </div>
+            
+            <!-- Recent Documents -->
+            <div style="margin-top: 20px;">
+                <h3>Recent Documents</h3>
+                <div id="recent-documents" style="max-height: 150px; overflow-y: auto;"></div>
             </div>
             
             <div style="margin-top: 20px;">
@@ -57,6 +97,8 @@
     <script>
         let currentEmail = {};
         let attachments = [];
+        let allMatters = [];
+        let selectedMatterId = null;
         
         Office.onReady((info) => {
             console.log('Office.js ready:', info);
@@ -64,6 +106,7 @@
                 setTimeout(() => {
                     loadEmailInfo();
                     loadMatters();
+                    loadRecentDocuments();
                 }, 500);
             } else {
                 document.getElementById('loading').textContent = 'Not running in Outlook';
@@ -144,19 +187,135 @@
                     return response.json();
                 })
                 .then(matters => {
-                    const select = document.getElementById('matter-select');
-                    matters.forEach(matter => {
-                        const option = document.createElement('option');
-                        option.value = matter.id;
-                        option.textContent = `${matter.client_name} - ${matter.name}`;
-                        select.appendChild(option);
-                    });
+                    allMatters = matters;
                     console.log('Loaded', matters.length, 'matters');
                 })
                 .catch(error => {
                     console.error('Error loading matters:', error);
-                    document.getElementById('matter-select').innerHTML = '<option value="">Error loading matters</option>';
                     showStatus('Error loading matters: ' + error.message, true);
+                });
+        }
+        
+        function searchMatters() {
+            const query = document.getElementById('matter-search').value.toLowerCase();
+            const dropdown = document.getElementById('matter-dropdown');
+            
+            if (query.length < 2) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            const filtered = allMatters.filter(matter => 
+                matter.client_name.toLowerCase().includes(query) || 
+                matter.name.toLowerCase().includes(query)
+            );
+            
+            dropdown.innerHTML = '';
+            
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div style="padding: 10px; color: #666;">No matters found</div>';
+            } else {
+                filtered.slice(0, 10).forEach(matter => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'padding: 8px; cursor: pointer; border-bottom: 1px solid #eee;';
+                    div.innerHTML = `<strong>${matter.client_name}</strong><br><small>${matter.name}</small>`;
+                    div.onclick = () => selectMatter(matter);
+                    div.onmouseover = () => div.style.background = '#f0f0f0';
+                    div.onmouseout = () => div.style.background = 'white';
+                    dropdown.appendChild(div);
+                });
+            }
+            
+            dropdown.style.display = 'block';
+        }
+        
+        function showMatterDropdown() {
+            if (allMatters.length > 0) {
+                searchMatters();
+            }
+        }
+        
+        function selectMatter(matter) {
+            selectedMatterId = matter.id;
+            document.getElementById('matter-search').value = `${matter.client_name} - ${matter.name}`;
+            document.getElementById('matter-dropdown').style.display = 'none';
+            console.log('Selected matter:', matter);
+        }
+        
+        function toggleNewMatterForm() {
+            const form = document.getElementById('new-matter-form');
+            const isVisible = form.style.display !== 'none';
+            form.style.display = isVisible ? 'none' : 'block';
+            
+            if (!isVisible) {
+                document.getElementById('client-name').value = '';
+                document.getElementById('matter-name').value = '';
+            }
+        }
+        
+        function createNewMatter() {
+            const clientName = document.getElementById('client-name').value.trim();
+            const matterName = document.getElementById('matter-name').value.trim();
+            
+            if (!clientName || !matterName) {
+                showStatus('Please enter both client and matter names', true);
+                return;
+            }
+            
+            showStatus('Creating new matter...');
+            
+            fetch('/api/matters/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clientName: clientName,
+                    matterName: matterName
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                showStatus('Matter created successfully!');
+                selectedMatterId = result.matter.id;
+                document.getElementById('matter-search').value = `${clientName} - ${matterName}`;
+                toggleNewMatterForm();
+                loadMatters(); // Refresh matters list
+            })
+            .catch(error => {
+                console.error('Error creating matter:', error);
+                showStatus('Error creating matter: ' + error.message, true);
+            });
+        }
+        
+        function loadRecentDocuments() {
+            fetch('/api/documents/recent')
+                .then(response => response.json())
+                .then(documents => {
+                    const container = document.getElementById('recent-documents');
+                    container.innerHTML = '';
+                    
+                    if (documents.length === 0) {
+                        container.innerHTML = '<div style="padding: 10px; color: #666; font-size: 12px;">No recent documents</div>';
+                        return;
+                    }
+                    
+                    documents.slice(0, 5).forEach(doc => {
+                        const div = document.createElement('div');
+                        div.style.cssText = 'padding: 8px; border-bottom: 1px solid #eee; font-size: 12px;';
+                        div.innerHTML = `
+                            <strong>${doc.title}</strong><br>
+                            <small style="color: #666;">${doc.client_name} - ${doc.matter_name}</small><br>
+                            <small style="color: #999;">${new Date(doc.created_at).toLocaleDateString()}</small>
+                        `;
+                        container.appendChild(div);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading recent documents:', error);
                 });
         }
         
@@ -171,8 +330,9 @@
         
         function saveEmail() {
             console.log('saveEmail clicked');
-            const matterId = document.getElementById('matter-select').value;
-            console.log('Selected matter ID:', matterId);
+            const matterId = selectedMatterId;
+            const documentType = document.getElementById('document-type').value;
+            console.log('Selected matter ID:', matterId, 'Document type:', documentType);
             
             if (!matterId) {
                 showStatus('Please select a matter first', true);
@@ -189,7 +349,8 @@
                         const emailData = {
                             ...currentEmail,
                             body: result.value || 'No body content',
-                            matterId: matterId
+                            matterId: matterId,
+                            documentType: documentType
                         };
                         
                         console.log('Sending email data:', emailData);
@@ -228,8 +389,9 @@
         
         function saveSelectedAttachments() {
             console.log('saveSelectedAttachments clicked');
-            const matterId = document.getElementById('matter-select').value;
-            console.log('Selected matter ID:', matterId);
+            const matterId = selectedMatterId;
+            const documentType = document.getElementById('document-type').value;
+            console.log('Selected matter ID:', matterId, 'Document type:', documentType);
             
             if (!matterId) {
                 showStatus('Please select a matter first', true);
@@ -266,7 +428,8 @@
                                 name: attachment.name,
                                 content: result.value.content,
                                 contentType: result.value.format,
-                                matterId: matterId
+                                matterId: matterId,
+                                documentType: documentType
                             };
                             
                             console.log('Sending attachment data for:', attachment.name);

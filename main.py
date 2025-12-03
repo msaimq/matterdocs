@@ -119,6 +119,68 @@ async def list_matters_api(session: AsyncSession = Depends(get_session)):
     return matters
 
 
+@app.post("/api/matters/create")
+async def create_matter(
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+):
+    """Create a new client and matter."""
+    data = await request.json()
+    client_name = data.get('clientName', '').strip()
+    matter_name = data.get('matterName', '').strip()
+    
+    if not client_name or not matter_name:
+        raise HTTPException(status_code=400, detail="Client name and matter name are required")
+    
+    # Check if client exists, create if not
+    client_result = await session.execute(
+        select(Client).where(Client.name == client_name)
+    )
+    client = client_result.scalars().first()
+    
+    if not client:
+        client = Client(name=client_name)
+        session.add(client)
+        await session.flush()
+    
+    # Create matter
+    matter = Matter(client_id=client.id, name=matter_name)
+    session.add(matter)
+    await session.flush()
+    
+    await session.commit()
+    
+    return {
+        "success": True,
+        "client": {"id": client.id, "name": client.name},
+        "matter": {"id": matter.id, "name": matter.name}
+    }
+
+
+@app.get("/api/documents/recent")
+async def get_recent_documents(session: AsyncSession = Depends(get_session)):
+    """Get recently created documents."""
+    result = await session.execute(
+        select(Document, Client.name.label('client_name'), Matter.name.label('matter_name'))
+        .join(Matter)
+        .join(Client)
+        .order_by(Document.created_at.desc())
+        .limit(10)
+    )
+    
+    documents = []
+    for document, client_name, matter_name in result.all():
+        documents.append({
+            "id": document.id,
+            "title": document.title,
+            "client_name": client_name,
+            "matter_name": matter_name,
+            "created_at": document.created_at.isoformat()
+        })
+    
+    return documents
+
+
 @app.post("/api/email/save")
 async def save_email(
     request: Request,
@@ -131,6 +193,7 @@ async def save_email(
     from_addr = data.get('from', '')
     date = data.get('date', '')
     body = data.get('body', '')
+    document_type = data.get('documentType', 'Email')
     
     # Verify matter exists
     matter_result = await session.execute(
@@ -142,7 +205,7 @@ async def save_email(
     
     # Create email document
     email_content = f"From: {from_addr}\nDate: {date}\nSubject: {subject}\n\n{body}"
-    document_title = f"Email: {subject[:50]}..."
+    document_title = f"{document_type}: {subject[:50]}..."
     
     # Check if document already exists
     doc_result = await session.execute(
@@ -206,6 +269,7 @@ async def save_attachment(
     name = data.get('name')
     content = data.get('content')  # Base64 encoded
     content_type = data.get('contentType')
+    document_type = data.get('documentType', 'Attachment')
     
     # Verify matter exists
     matter_result = await session.execute(
@@ -223,7 +287,7 @@ async def save_attachment(
         raise HTTPException(status_code=400, detail="Invalid attachment content")
     
     # Create document
-    document_title = f"Attachment: {name}"
+    document_title = f"{document_type}: {name}"
     
     # Check if document already exists
     doc_result = await session.execute(
