@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Matters</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Client</th>
+            <th>Matter</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for matter in matters %}
+        <tr>
+            <td>{{ matter.client.name }}</td>
+            <td>{{ matter.name }}</td>
+            <td><a href="/matters/{{ matter.id }}">View</a></td>
+        </tr>
+    {% else %}
+        <tr><td colspan="3">No matters found.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

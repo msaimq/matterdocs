@@ -1,0 +1,30 @@
+service: matterdocs
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  environment:
+    DATABASE_URL: sqlite:///tmp/matterdocs.db
+    STORAGE_ROOT: /tmp/storage
+
+functions:
+  api:
+    handler: lambda_handler.handler
+    timeout: 30
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true

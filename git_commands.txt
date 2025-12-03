@@ -1,0 +1,39 @@
+# Git Setup Commands for MatterDocs
+
+## 1. Initialize Git (run in your DMS folder)
+git init
+
+## 2. Add all files
+git add .
+
+## 3. Create initial commit
+git commit -m "Initial commit: MatterDocs legal document management system"
+
+## 4. Create GitHub repository
+# Go to: https://github.com/new
+# Repository name: matterdocs
+# Description: Legal document management system with Outlook integration
+# Public or Private: Your choice
+# DO NOT check "Add a README file" (we already have one)
+
+## 5. Connect to GitHub (replace with your actual URL)
+git remote add origin https://github.com/YOUR_USERNAME/matterdocs.git
+
+## 6. Push to GitHub
+git branch -M main
+git push -u origin main
+
+## 7. Deploy to Railway
+# Option A: From GitHub
+# 1. Go to railway.app
+# 2. Click "Deploy from GitHub"
+# 3. Select your matterdocs repository
+# 4. Railway auto-deploys!
+
+# Option B: Direct deploy
+# railway login
+# railway up
+
+## 8. Update manifest with Railway URL
+# After deployment, get your Railway URL and run:
+# python update_manifest.py https://your-app.railway.app

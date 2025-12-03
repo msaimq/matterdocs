@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
+  <Id>b5c4a2b2-1b6a-4a4c-9f2e-0b6a8a2a9d8e</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>MatterDocs</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="MatterDocs (Local)" />
+  <Description DefaultValue="Access MatterDocs locally from Outlook." />
+  <IconUrl DefaultValue="https://localhost:8000/static/icon-64.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:8000/static/icon-64.png" />
+  <SupportUrl DefaultValue="https://localhost:8000" />
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+  <Requirements>
+    <Sets DefaultMinVersion="1.5">
+      <Set Name="Mailbox" />
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://localhost:8000/addin/taskpane" />
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="And">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+  </Rule>
+  <VersionOverrides xsi:type="mailappor:VersionOverridesV1_0">
+    <mailappor:Requirements>
+      <mailappor:Sets DefaultMinVersion="1.5">
+        <mailappor:Set Name="Mailbox" />
+      </mailappor:Sets>
+    </mailappor:Requirements>
+    <mailappor:Hosts>
+      <mailappor:Host xsi:type="mailappor:Mailbox">
+        <mailappor:DesktopFormFactor>
+          <mailappor:FunctionFile resid="Commands.Url" />
+          <mailappor:ExtensionPoint xsi:type="mailappor:MessageReadCommandSurface">
+            <mailappor:OfficeTab id="TabDefault">
+              <mailappor:Group id="MatterDocsGroupRead" label="MatterDocs" icon="Icon.32">
+                <mailappor:Control xsi:type="mailappor:Button" id="MatterDocsOpenPaneRead">
+                  <mailappor:Label resid="Commands.Label" />
+                  <mailappor:Supertip>
+                    <mailappor:Title resid="Commands.Label" />
+                    <mailappor:Description resid="Commands.Tooltip" />
+                  </mailappor:Supertip>
+                  <mailappor:Icon>
+                    <mailappor:bt:Image size="32" resid="Icon.32" />
+                    <mailappor:bt:Image size="64" resid="Icon.64" />
+                  </mailappor:Icon>
+                  <mailappor:Action xsi:type="mailappor:ShowTaskpane">
+                    <mailappor:TaskpaneId>ButtonReadTaskPane</mailappor:TaskpaneId>
+                    <mailappor:SourceLocation resid="Taskpane.Url" />
+                  </mailappor:Action>
+                </mailappor:Control>
+              </mailappor:Group>
+            </mailappor:OfficeTab>
+          </mailappor:ExtensionPoint>
+          <mailappor:ExtensionPoint xsi:type="mailappor:MessageComposeCommandSurface">
+            <mailappor:OfficeTab id="TabDefault">
+              <mailappor:Group id="MatterDocsGroupCompose" label="MatterDocs" icon="Icon.32">
+                <mailappor:Control xsi:type="mailappor:Button" id="MatterDocsOpenPaneCompose">
+                  <mailappor:Label resid="Commands.Label" />
+                  <mailappor:Supertip>
+                    <mailappor:Title resid="Commands.Label" />
+                    <mailappor:Description resid="Commands.Tooltip" />
+                  </mailappor:Supertip>
+                  <mailappor:Icon>
+                    <mailappor:bt:Image size="32" resid="Icon.32" />
+                    <mailappor:bt:Image size="64" resid="Icon.64" />
+                  </mailappor:Icon>
+                  <mailappor:Action xsi:type="mailappor:ShowTaskpane">
+                    <mailappor:TaskpaneId>ButtonComposeTaskPane</mailappor:TaskpaneId>
+                    <mailappor:SourceLocation resid="Taskpane.Url" />
+                  </mailappor:Action>
+                </mailappor:Control>
+              </mailappor:Group>
+            </mailappor:OfficeTab>
+          </mailappor:ExtensionPoint>
+        </mailappor:DesktopFormFactor>
+      </mailappor:Host>
+    </mailappor:Hosts>
+    <mailappor:Resources>
+      <bt:Images>
+        <bt:Image resid="Icon.32" DefaultValue="https://localhost:8000/static/icon-32.png" />
+        <bt:Image resid="Icon.64" DefaultValue="https://localhost:8000/static/icon-64.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:8000/addin/commands" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8000/addin/taskpane" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Commands.Label" DefaultValue="MatterDocs" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Commands.Tooltip" DefaultValue="Open MatterDocs taskpane." />
+      </bt:LongStrings>
+    </mailappor:Resources>
+    <mailappor:WebApplicationInfo>
+      <mailappor:Id>b5c4a2b2-1b6a-4a4c-9f2e-0b6a8a2a9d8e</mailappor:Id>
+      <mailappor:Resource>api://localhost:8000/b5c4a2b2-1b6a-4a4c-9f2e-0b6a8a2a9d8e</mailappor:Resource>
+      <mailappor:Scopes>
+        <mailappor:Scope>ReadItem</mailappor:Scope>
+      </mailappor:Scopes>
+    </mailappor:WebApplicationInfo>
+  </VersionOverrides>
+</OfficeApp>

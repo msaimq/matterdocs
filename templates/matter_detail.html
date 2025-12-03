@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ client.name }} - {{ matter.name }}</h2>
+
+<h3>Documents</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Latest Version</th>
+            <th>Summary</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for doc, version in documents_with_versions %}
+        <tr>
+            <td>{{ doc.title }}</td>
+            <td>{{ version.version_number if version else 'N/A' }}</td>
+            <td>
+                {% if version %}
+                    {{ version.summary[:150] }}{% if version.summary|length > 150 %}...{% endif %}
+                {% else %}
+                    No versions yet.
+                {% endif %}
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="3">No documents uploaded.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<section class="upload">
+    <h3>Upload Document</h3>
+    <form method="post" action="/matters/{{ matter.id }}/upload" enctype="multipart/form-data">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" required>
+
+        <label for="file">File</label>
+        <input type="file" id="file" name="file" required>
+
+        <button type="submit">Upload</button>
+    </form>
+</section>
+{% endblock %}
