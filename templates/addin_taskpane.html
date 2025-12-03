@@ -44,6 +44,8 @@
                 
                 <button class="button" onclick="saveEmail()">Save Email</button>
                 <button class="button" onclick="saveSelectedAttachments()">Save Selected Attachments</button>
+                
+                <div id="status-message" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px; display: none;"></div>
             </div>
             
             <div style="margin-top: 20px;">
@@ -149,11 +151,22 @@
                         option.textContent = `${matter.client_name} - ${matter.name}`;
                         select.appendChild(option);
                     });
+                    console.log('Loaded', matters.length, 'matters');
                 })
                 .catch(error => {
                     console.error('Error loading matters:', error);
                     document.getElementById('matter-select').innerHTML = '<option value="">Error loading matters</option>';
+                    showStatus('Error loading matters: ' + error.message, true);
                 });
+        }
+        
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = isError ? '#ffebee' : '#e8f5e8';
+            statusDiv.style.color = isError ? '#c62828' : '#2e7d32';
+            console.log(message);
         }
         
         function saveEmail() {
@@ -162,11 +175,11 @@
             console.log('Selected matter ID:', matterId);
             
             if (!matterId) {
-                alert('Please select a matter first');
+                showStatus('Please select a matter first', true);
                 return;
             }
             
-            alert('Starting to save email...');
+            showStatus('Starting to save email...');
             
             try {
                 console.log('Getting email body...');
@@ -180,6 +193,7 @@
                         };
                         
                         console.log('Sending email data:', emailData);
+                        showStatus('Saving email to server...');
                         
                         fetch('/api/email/save', {
                             method: 'POST',
@@ -195,20 +209,20 @@
                         })
                         .then(result => {
                             console.log('Save result:', result);
-                            alert('Email saved successfully!');
+                            showStatus('Email saved successfully!');
                         })
                         .catch(error => {
                             console.error('Error saving email:', error);
-                            alert('Error saving email: ' + error.message);
+                            showStatus('Error saving email: ' + error.message, true);
                         });
                     } else {
                         console.error('Failed to get email body:', result.error);
-                        alert('Failed to get email content: ' + (result.error ? result.error.message : 'Unknown error'));
+                        showStatus('Failed to get email content: ' + (result.error ? result.error.message : 'Unknown error'), true);
                     }
                 });
             } catch (error) {
                 console.error('Error in saveEmail:', error);
-                alert('Error: ' + error.message);
+                showStatus('Error: ' + error.message, true);
             }
         }
         
@@ -218,7 +232,7 @@
             console.log('Selected matter ID:', matterId);
             
             if (!matterId) {
-                alert('Please select a matter first');
+                showStatus('Please select a matter first', true);
                 return;
             }
             
@@ -233,11 +247,13 @@
             console.log('Selected attachments:', selectedAttachments);
             
             if (selectedAttachments.length === 0) {
-                alert('Please select at least one attachment');
+                showStatus('Please select at least one attachment', true);
                 return;
             }
             
-            alert(`Processing ${selectedAttachments.length} attachment(s)...`);
+            showStatus(`Processing ${selectedAttachments.length} attachment(s)...`);
+            
+            let savedCount = 0;
             
             // Process each attachment
             selectedAttachments.forEach((attachment, index) => {
@@ -269,22 +285,23 @@
                             })
                             .then(result => {
                                 console.log('Attachment saved:', attachment.name, result);
-                                if (index === selectedAttachments.length - 1) {
-                                    alert('All attachments saved successfully!');
+                                savedCount++;
+                                if (savedCount === selectedAttachments.length) {
+                                    showStatus('All attachments saved successfully!');
                                 }
                             })
                             .catch(error => {
                                 console.error('Error saving attachment:', error);
-                                alert('Error saving attachment ' + attachment.name + ': ' + error.message);
+                                showStatus('Error saving attachment ' + attachment.name + ': ' + error.message, true);
                             });
                         } else {
                             console.error('Failed to get attachment content:', result.error);
-                            alert('Failed to get attachment: ' + attachment.name + ' - ' + (result.error ? result.error.message : 'Unknown error'));
+                            showStatus('Failed to get attachment: ' + attachment.name + ' - ' + (result.error ? result.error.message : 'Unknown error'), true);
                         }
                     });
                 } catch (error) {
                     console.error('Error processing attachment:', error);
-                    alert('Error processing attachment ' + attachment.name + ': ' + error.message);
+                    showStatus('Error processing attachment ' + attachment.name + ': ' + error.message, true);
                 }
             });
         }
