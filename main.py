@@ -234,11 +234,13 @@ async def save_email(
     # Generate AI summary
     summary, tags = await summarize_text(email_content)
     
-    # Save document version
+    # Save document version with content in database
     doc_version = DocumentVersion(
         document_id=document.id,
         version_number=next_version_number,
         file_path=f"email_{document.id}_{next_version_number}.txt",
+        filename=f"{subject[:30]}.txt",
+        file_content=email_content.encode('utf-8'),
         summary=summary,
     )
     session.add(doc_version)
@@ -328,11 +330,13 @@ async def save_attachment(
     # Generate AI summary
     summary, tags = await summarize_text(text_content)
     
-    # Save document version
+    # Save document version with content in database
     doc_version = DocumentVersion(
         document_id=document.id,
         version_number=next_version_number,
         file_path=str(file_path),
+        filename=name,
+        file_content=file_bytes,
         summary=summary,
     )
     session.add(doc_version)
@@ -374,29 +378,42 @@ async def download_document(
         raise HTTPException(status_code=404, detail="Document version not found")
     
     version, title = version_data
-    file_path = Path(version.file_path)
     
-    # Check if file exists on disk
-    if not file_path.exists():
-        # For Railway: Files are lost on restart, so create a text file with summary
-        content = f"Document: {title}\nVersion: {version_number}\nSummary: {version.summary}\n\nNote: Original file not available (Railway storage limitation)"
-        
-        # Create temporary file
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-            temp_file.write(content)
+    # Check if file content is stored in database
+    if version.file_content:
+        # Create temporary file from database content
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_file.write(version.file_content)
             temp_path = temp_file.name
+        
+        filename = version.filename or f"{title}_v{version_number}.txt"
         
         return FileResponse(
             path=temp_path,
-            filename=f"{title}_v{version_number}_summary.txt",
-            media_type='text/plain'
+            filename=filename,
+            media_type='application/octet-stream'
         )
     
+    # Fallback: try filesystem (for backward compatibility)
+    file_path = Path(version.file_path)
+    if file_path.exists():
+        return FileResponse(
+            path=file_path,
+            filename=f"{title}_v{version_number}{file_path.suffix}",
+            media_type='application/octet-stream'
+        )
+    
+    # Last resort: create summary file
+    content = f"Document: {title}\nVersion: {version_number}\nSummary: {version.summary}\n\nNote: Original file content not available"
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+        temp_file.write(content)
+        temp_path = temp_file.name
+    
     return FileResponse(
-        path=file_path,
-        filename=f"{title}_v{version_number}{file_path.suffix}",
-        media_type='application/octet-stream'
+        path=temp_path,
+        filename=f"{title}_v{version_number}_summary.txt",
+        media_type='text/plain'
     )
 
 
@@ -424,8 +441,18 @@ async def preview_document(
     file_path = Path(version.file_path)
     
     # Try to read file content for preview
-    content = "File not available (Railway storage limitation)"
-    if file_path.exists():
+    content = "File not available"
+    
+    # First try database content
+    if version.file_content:
+        try:
+            # Try to decode as text
+            content = version.file_content.decode('utf-8', errors='ignore')
+        except Exception as e:
+            content = f"Binary file: {version.filename or 'unknown'}\nSize: {len(version.file_content)} bytes"
+    
+    # Fallback to filesystem
+    elif file_path.exists():
         try:
             if file_path.suffix.lower() in ['.txt', '.md', '.csv']:
                 content = file_path.read_text(encoding='utf-8', errors='ignore')
@@ -435,9 +462,10 @@ async def preview_document(
                 content = f"Binary file: {file_path.name}\nSize: {file_path.stat().st_size} bytes"
         except Exception as e:
             content = f"Error reading file: {str(e)}"
+    
+    # Last resort: show summary
     else:
-        # Show summary instead of file content
-        content = f"Original file not available.\n\nDocument Summary:\n{version.summary}\n\nNote: Files are not persisted on Railway. Consider using cloud storage (AWS S3, etc.) for production."
+        content = f"Original file not available.\n\nDocument Summary:\n{version.summary}"
     
     return {
         "title": title,
@@ -573,11 +601,13 @@ async def upload_document(
 
     summary, tags = await summarize_text(text_content)
 
-    # Store file metadata and content
+    # Store file metadata and content in database
     doc_version = DocumentVersion(
         document_id=document.id,
         version_number=next_version_number,
-        file_path=str(file_path),  # Note: This path won't persist on Railway
+        file_path=str(file_path),
+        filename=file.filename,
+        file_content=file_bytes,
         summary=summary,
     )
     session.add(doc_version)
