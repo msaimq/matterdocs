@@ -57,71 +57,90 @@
         let attachments = [];
         
         Office.onReady((info) => {
+            console.log('Office.js ready:', info);
             if (info.host === Office.HostType.Outlook) {
-                loadEmailInfo();
-                loadMatters();
+                setTimeout(() => {
+                    loadEmailInfo();
+                    loadMatters();
+                }, 500);
+            } else {
+                document.getElementById('loading').textContent = 'Not running in Outlook';
             }
         });
         
         function loadEmailInfo() {
-            Office.context.mailbox.item.subject.getAsync((result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    document.getElementById('email-subject').textContent = result.value || 'No subject';
-                    currentEmail.subject = result.value;
-                }
-            });
-            
-            Office.context.mailbox.item.from.getAsync((result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    const from = result.value.displayName + ' <' + result.value.emailAddress + '>';
-                    document.getElementById('email-from').textContent = from;
-                    currentEmail.from = from;
-                }
-            });
-            
-            Office.context.mailbox.item.dateTimeCreated.getAsync((result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    const date = new Date(result.value).toLocaleString();
-                    document.getElementById('email-date').textContent = date;
-                    currentEmail.date = date;
-                }
-            });
-            
-            loadAttachments();
+            try {
+                const item = Office.context.mailbox.item;
+                console.log('Item:', item);
+                
+                // Get subject (synchronous property)
+                const subject = item.subject || 'No subject';
+                document.getElementById('email-subject').textContent = subject;
+                currentEmail.subject = subject;
+                
+                // Get from (synchronous property)
+                const from = item.from ? (item.from.displayName + ' <' + item.from.emailAddress + '>') : 'Unknown sender';
+                document.getElementById('email-from').textContent = from;
+                currentEmail.from = from;
+                
+                // Get date (synchronous property)
+                const date = item.dateTimeCreated ? new Date(item.dateTimeCreated).toLocaleString() : 'Unknown date';
+                document.getElementById('email-date').textContent = date;
+                currentEmail.date = date;
+                
+                loadAttachments();
+                
+            } catch (error) {
+                console.error('Error loading email info:', error);
+                document.getElementById('loading').textContent = 'Error loading email: ' + error.message;
+            }
         }
         
         function loadAttachments() {
-            const item = Office.context.mailbox.item;
-            attachments = item.attachments || [];
-            
-            document.getElementById('attachment-count').textContent = attachments.length;
-            
-            const container = document.getElementById('attachments-container');
-            container.innerHTML = '';
-            
-            if (attachments.length === 0) {
-                container.innerHTML = '<div class="attachment-item">No attachments found</div>';
-            } else {
-                attachments.forEach((attachment, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'attachment-item';
-                    div.innerHTML = `
-                        <input type="checkbox" id="att-${index}" checked>
-                        <label for="att-${index}">
-                            <strong>${attachment.name}</strong> (${formatFileSize(attachment.size)})
-                        </label>
-                    `;
-                    container.appendChild(div);
-                });
+            try {
+                const item = Office.context.mailbox.item;
+                attachments = item.attachments || [];
+                
+                console.log('Attachments found:', attachments.length);
+                
+                document.getElementById('attachment-count').textContent = attachments.length;
+                
+                const container = document.getElementById('attachments-container');
+                container.innerHTML = '';
+                
+                if (attachments.length === 0) {
+                    container.innerHTML = '<div class="attachment-item">No attachments found</div>';
+                } else {
+                    attachments.forEach((attachment, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'attachment-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="att-${index}" checked>
+                            <label for="att-${index}">
+                                <strong>${attachment.name}</strong> (${formatFileSize(attachment.size || 0)})
+                            </label>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('email-content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading attachments:', error);
+                document.getElementById('loading').textContent = 'Error loading attachments: ' + error.message;
             }
-            
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('email-content').style.display = 'block';
         }
         
         function loadMatters() {
             fetch('/api/matters/list')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load matters');
+                    }
+                    return response.json();
+                })
                 .then(matters => {
                     const select = document.getElementById('matter-select');
                     matters.forEach(matter => {
@@ -131,7 +150,10 @@
                         select.appendChild(option);
                     });
                 })
-                .catch(error => console.error('Error loading matters:', error));
+                .catch(error => {
+                    console.error('Error loading matters:', error);
+                    document.getElementById('matter-select').innerHTML = '<option value="">Error loading matters</option>';
+                });
         }
         
         function saveEmail() {
@@ -141,29 +163,37 @@
                 return;
             }
             
-            Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, (result) => {
-                if (result.status === Office.AsyncResultStatus.Succeeded) {
-                    const emailData = {
-                        ...currentEmail,
-                        body: result.value,
-                        matterId: matterId
-                    };
-                    
-                    fetch('/api/email/save', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(emailData)
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        alert('Email saved successfully!');
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Error saving email');
-                    });
-                }
-            });
+            try {
+                Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        const emailData = {
+                            ...currentEmail,
+                            body: result.value || 'No body content',
+                            matterId: matterId
+                        };
+                        
+                        fetch('/api/email/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(emailData)
+                        })
+                        .then(response => response.json())
+                        .then(result => {
+                            alert('Email saved successfully!');
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Error saving email: ' + error.message);
+                        });
+                    } else {
+                        console.error('Failed to get email body:', result.error);
+                        alert('Failed to get email content');
+                    }
+                });
+            } catch (error) {
+                console.error('Error in saveEmail:', error);
+                alert('Error: ' + error.message);
+            }
         }
         
         function saveSelectedAttachments() {
@@ -186,34 +216,46 @@
                 return;
             }
             
-            // Process each attachment
-            selectedAttachments.forEach(attachment => {
-                Office.context.mailbox.item.getAttachmentContentAsync(attachment.id, (result) => {
-                    if (result.status === Office.AsyncResultStatus.Succeeded) {
-                        const attachmentData = {
-                            name: attachment.name,
-                            content: result.value.content,
-                            contentType: result.value.format,
-                            matterId: matterId
-                        };
-                        
-                        fetch('/api/attachments/save', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(attachmentData)
-                        })
-                        .then(response => response.json())
-                        .then(result => {
-                            console.log('Attachment saved:', attachment.name);
-                        })
-                        .catch(error => {
-                            console.error('Error saving attachment:', error);
-                        });
-                    }
-                });
-            });
+            alert(`Processing ${selectedAttachments.length} attachment(s)...`);
             
-            alert(`Saving ${selectedAttachments.length} attachment(s)...`);
+            // Process each attachment
+            selectedAttachments.forEach((attachment, index) => {
+                try {
+                    Office.context.mailbox.item.getAttachmentContentAsync(attachment.id, (result) => {
+                        if (result.status === Office.AsyncResultStatus.Succeeded) {
+                            const attachmentData = {
+                                name: attachment.name,
+                                content: result.value.content,
+                                contentType: result.value.format,
+                                matterId: matterId
+                            };
+                            
+                            fetch('/api/attachments/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(attachmentData)
+                            })
+                            .then(response => response.json())
+                            .then(result => {
+                                console.log('Attachment saved:', attachment.name);
+                                if (index === selectedAttachments.length - 1) {
+                                    alert('All attachments saved successfully!');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error saving attachment:', error);
+                                alert('Error saving attachment: ' + attachment.name);
+                            });
+                        } else {
+                            console.error('Failed to get attachment content:', result.error);
+                            alert('Failed to get attachment: ' + attachment.name);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error processing attachment:', error);
+                    alert('Error processing attachment: ' + attachment.name);
+                }
+            });
         }
         
         function formatFileSize(bytes) {
