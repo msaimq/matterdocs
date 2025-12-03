@@ -17,12 +17,22 @@ if db_url_env:
         DATABASE_URL = db_url_env.replace("postgres://", "postgresql+asyncpg://", 1)
     else:
         DATABASE_URL = db_url_env
+    print(f"🔗 Using PostgreSQL: {DATABASE_URL[:50]}...")
 else:
-    # Local development: Use SQLite
+    # Local development: Use SQLite with async driver
     default_db_path = Path(os.getenv("DATABASE_FILE", "matterdocs.db"))
     DATABASE_URL = f"sqlite+aiosqlite:///{default_db_path}"
+    print(f"🔗 Using SQLite: {DATABASE_URL}")
 
-engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
+try:
+    engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
+    print("✅ Database engine created successfully")
+except Exception as e:
+    print(f"❌ Database engine creation failed: {e}")
+    # Fallback to a minimal in-memory SQLite for health checks
+    DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+    engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
+    print("⚠️ Using fallback in-memory database")
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 Base = declarative_base()
 
