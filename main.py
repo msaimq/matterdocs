@@ -126,7 +126,7 @@ async def save_email(
 ):
     """Save email content as a document."""
     data = await request.json()
-    matter_id = data.get('matterId')
+    matter_id = int(data.get('matterId'))  # Convert to integer
     subject = data.get('subject', 'No Subject')
     from_addr = data.get('from', '')
     date = data.get('date', '')
@@ -202,7 +202,7 @@ async def save_attachment(
 ):
     """Save email attachment as a document."""
     data = await request.json()
-    matter_id = data.get('matterId')
+    matter_id = int(data.get('matterId'))  # Convert to integer
     name = data.get('name')
     content = data.get('content')  # Base64 encoded
     content_type = data.get('contentType')
