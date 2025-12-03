@@ -30,8 +30,16 @@ async def get_session() -> AsyncSession:
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    await init_db()
-    await seed_data()
+    try:
+        # Ensure storage directory exists
+        STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize database
+        await init_db()
+        await seed_data()
+        print("✅ Application startup completed successfully")
+    except Exception as e:
+        print(f"❌ Startup error: {e}")
 
 
 async def seed_data() -> None:
@@ -52,6 +60,11 @@ async def seed_data() -> None:
             )
             await session.commit()
 
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Railway."""
+    return {"status": "healthy", "service": "MatterDocs"}
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
