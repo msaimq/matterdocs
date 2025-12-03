@@ -10,6 +10,18 @@ load_dotenv()
 # Railway provides DATABASE_URL for PostgreSQL
 db_url_env = os.getenv("DATABASE_URL", "").strip()
 
+# Also check for individual PostgreSQL variables if DATABASE_URL is missing
+if not db_url_env:
+    pghost = os.getenv("PGHOST")
+    pgport = os.getenv("PGPORT", "5432")
+    pguser = os.getenv("PGUSER")
+    pgpassword = os.getenv("PGPASSWORD")
+    pgdatabase = os.getenv("PGDATABASE")
+    
+    if all([pghost, pguser, pgpassword, pgdatabase]):
+        db_url_env = f"postgresql://{pguser}:{pgpassword}@{pghost}:{pgport}/{pgdatabase}"
+        print(f"🔧 Built DATABASE_URL from individual variables")
+
 if db_url_env:
     # Production: Use Railway's PostgreSQL
     print(f"🔍 Original URL: {db_url_env[:50]}...")
