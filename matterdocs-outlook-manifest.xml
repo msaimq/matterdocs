@@ -4,11 +4,11 @@
   <Version>1.0.0.0</Version>
   <ProviderName>MatterDocs</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="MatterDocs (Local)" />
-  <Description DefaultValue="Access MatterDocs locally from Outlook." />
-  <IconUrl DefaultValue="https://localhost:8000/static/icon-64.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:8000/static/icon-64.png" />
-  <SupportUrl DefaultValue="https://localhost:8000" />
+  <DisplayName DefaultValue="MatterDocs" />
+  <Description DefaultValue="Access MatterDocs from Outlook." />
+  <IconUrl DefaultValue="https://web-production-cdca1.up.railway.app/static/icon-64.png" />
+  <HighResolutionIconUrl DefaultValue="https://web-production-cdca1.up.railway.app/static/icon-64.png" />
+  <SupportUrl DefaultValue="https://web-production-cdca1.up.railway.app" />
   <Hosts>
     <Host Name="Mailbox" />
   </Hosts>
@@ -20,7 +20,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://localhost:8000/addin/taskpane" />
+        <SourceLocation DefaultValue="https://web-production-cdca1.up.railway.app/addin/taskpane" />
       </DesktopSettings>
     </Form>
   </FormSettings>
@@ -48,8 +48,8 @@
                     <mailappor:Description resid="Commands.Tooltip" />
                   </mailappor:Supertip>
                   <mailappor:Icon>
-                    <mailappor:bt:Image size="32" resid="Icon.32" />
-                    <mailappor:bt:Image size="64" resid="Icon.64" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="64" resid="Icon.64" />
                   </mailappor:Icon>
                   <mailappor:Action xsi:type="mailappor:ShowTaskpane">
                     <mailappor:TaskpaneId>ButtonReadTaskPane</mailappor:TaskpaneId>
@@ -69,8 +69,8 @@
                     <mailappor:Description resid="Commands.Tooltip" />
                   </mailappor:Supertip>
                   <mailappor:Icon>
-                    <mailappor:bt:Image size="32" resid="Icon.32" />
-                    <mailappor:bt:Image size="64" resid="Icon.64" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="64" resid="Icon.64" />
                   </mailappor:Icon>
                   <mailappor:Action xsi:type="mailappor:ShowTaskpane">
                     <mailappor:TaskpaneId>ButtonComposeTaskPane</mailappor:TaskpaneId>
@@ -85,12 +85,12 @@
     </mailappor:Hosts>
     <mailappor:Resources>
       <bt:Images>
-        <bt:Image resid="Icon.32" DefaultValue="https://localhost:8000/static/icon-32.png" />
-        <bt:Image resid="Icon.64" DefaultValue="https://localhost:8000/static/icon-64.png" />
+        <bt:Image resid="Icon.32" DefaultValue="https://web-production-cdca1.up.railway.app/static/icon-32.png" />
+        <bt:Image resid="Icon.64" DefaultValue="https://web-production-cdca1.up.railway.app/static/icon-64.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://localhost:8000/addin/commands" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8000/addin/taskpane" />
+        <bt:Url id="Commands.Url" DefaultValue="https://web-production-cdca1.up.railway.app/addin/commands" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://web-production-cdca1.up.railway.app/addin/taskpane" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Commands.Label" DefaultValue="MatterDocs" />
@@ -101,7 +101,7 @@
     </mailappor:Resources>
     <mailappor:WebApplicationInfo>
       <mailappor:Id>b5c4a2b2-1b6a-4a4c-9f2e-0b6a8a2a9d8e</mailappor:Id>
-      <mailappor:Resource>api://localhost:8000/b5c4a2b2-1b6a-4a4c-9f2e-0b6a8a2a9d8e</mailappor:Resource>
+      <mailappor:Resource>api://web-production-cdca1.up.railway.app/b5c4a2b2-1b6a-4a4c-9f2e-0b6a8a2a9d8e</mailappor:Resource>
       <mailappor:Scopes>
         <mailappor:Scope>ReadItem</mailappor:Scope>
       </mailappor:Scopes>
