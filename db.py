@@ -7,9 +7,20 @@ from sqlalchemy.orm import declarative_base
 
 load_dotenv()
 
-default_db_path = Path(os.getenv("DATABASE_FILE", "matterdocs.db"))
+# Railway provides DATABASE_URL for PostgreSQL
 db_url_env = os.getenv("DATABASE_URL", "").strip()
-DATABASE_URL = db_url_env or f"sqlite+aiosqlite:///{default_db_path}"
+
+if db_url_env:
+    # Production: Use Railway's PostgreSQL
+    if db_url_env.startswith("postgres://"):
+        # Fix for SQLAlchemy 2.0 compatibility
+        DATABASE_URL = db_url_env.replace("postgres://", "postgresql+asyncpg://", 1)
+    else:
+        DATABASE_URL = db_url_env
+else:
+    # Local development: Use SQLite
+    default_db_path = Path(os.getenv("DATABASE_FILE", "matterdocs.db"))
+    DATABASE_URL = f"sqlite+aiosqlite:///{default_db_path}"
 
 engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)

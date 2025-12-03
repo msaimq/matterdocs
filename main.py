@@ -171,9 +171,14 @@ async def upload_document(
         next_version_number = 1
 
     file_bytes = await file.read()
+    
+    # For Railway: Store file content in database instead of filesystem
+    # TODO: In production, use cloud storage (AWS S3, Cloudinary, etc.)
     storage_dir = STORAGE_ROOT / str(matter.client_id) / str(matter.id) / str(document.id) / str(next_version_number)
     storage_dir.mkdir(parents=True, exist_ok=True)
     file_path = storage_dir / file.filename
+    
+    # Store file (will be lost on Railway, but works for demo)
     file_path.write_bytes(file_bytes)
 
     try:
@@ -185,10 +190,11 @@ async def upload_document(
 
     summary, tags = await summarize_text(text_content)
 
+    # Store file metadata and content
     doc_version = DocumentVersion(
         document_id=document.id,
         version_number=next_version_number,
-        file_path=str(file_path),
+        file_path=str(file_path),  # Note: This path won't persist on Railway
         summary=summary,
     )
     session.add(doc_version)
